@@ -189,12 +189,16 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-8 text-white">
+    <main className="min-h-screen bg-black px-4 py-8 text-white">
       <div className="mx-auto max-w-5xl">
         <header className="mb-8 text-center">
-          <div className="text-5xl">📱</div>
+          <img
+  src="/logo.png"
+  alt="DenysCell"
+  className="mx-auto w-full max-w-xl mb-4"
+/>
 
-          <h1 className="mt-3 text-3xl font-black text-blue-500 sm:text-4xl">
+          <h1 className="mt-3 text-3xl font-black text-red-500"> sm:text-4xl">
             DenysCell Orçamentos
           </h1>
 
