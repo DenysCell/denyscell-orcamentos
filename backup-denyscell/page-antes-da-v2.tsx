@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 type Peca = {
@@ -27,29 +27,6 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-const marcasSugeridas = [
-  "Apple",
-  "Samsung",
-  "Motorola",
-  "Xiaomi",
-  "Realme",
-  "LG",
-  "Asus",
-  "Nokia",
-  "Positivo",
-  "Multilaser",
-];
-
-const tiposDeTela = [
-  "Incell",
-  "OLED",
-  "Original",
-  "Original nacional",
-  "Com aro",
-  "Sem aro",
-  "Outro",
-];
-
 function dinheiro(valor: number) {
   return valor.toLocaleString("pt-BR", {
     style: "currency",
@@ -66,8 +43,8 @@ function normalizar(texto: string) {
     .replace(/[^a-z0-9]/g, "");
 }
 
-function converterPreco(valor: string) {
-  return Number(valor.replace(/\./g, "").replace(",", "."));
+function ordenarTexto(a: string, b: string) {
+  return a.localeCompare(b, "pt-BR", { sensitivity: "base" });
 }
 
 export default function Home() {
@@ -80,11 +57,12 @@ export default function Home() {
 
   const [marca, setMarca] = useState("");
   const [modelo, setModelo] = useState("");
+  const [novoModelo, setNovoModelo] = useState(true);
   const [tipo, setTipo] = useState("Incell");
   const [preco, setPreco] = useState("");
   const [link, setLink] = useState("");
   const [fornecedor, setFornecedor] = useState("Mercado Livre");
-  const [editandoId, setEditandoId] = useState<number | null>(null);
+  const [idEmEdicao, setIdEmEdicao] = useState<number | null>(null);
 
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [senhaDigitada, setSenhaDigitada] = useState("");
@@ -93,8 +71,6 @@ export default function Home() {
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [erroBanco, setErroBanco] = useState("");
-
-  const modeloRef = useRef<HTMLInputElement>(null);
 
   const carregarPecas = useCallback(async () => {
     setCarregando(true);
@@ -133,22 +109,26 @@ export default function Home() {
     void carregarPecas();
   }, [carregarPecas]);
 
-  const marcasDisponiveis = useMemo(() => {
-    return Array.from(
-      new Set([...marcasSugeridas, ...pecas.map((peca) => peca.marca)].filter(Boolean))
-    ).sort((a, b) => a.localeCompare(b, "pt-BR"));
-  }, [pecas]);
+  const marcas = useMemo(
+    () =>
+      Array.from(
+        new Set(pecas.map((peca) => peca.marca.trim()).filter(Boolean))
+      ).sort(ordenarTexto),
+    [pecas]
+  );
 
-  const modelosDisponiveis = useMemo(() => {
-    return Array.from(
-      new Set(
-        pecas
-          .filter((peca) => !marca || normalizar(peca.marca) === normalizar(marca))
-          .map((peca) => peca.modelo)
-          .filter(Boolean)
-      )
-    ).sort((a, b) => a.localeCompare(b, "pt-BR"));
-  }, [pecas, marca]);
+  const modelosDaMarca = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          pecas
+            .filter((peca) => normalizar(peca.marca) === normalizar(marca))
+            .map((peca) => peca.modelo.trim())
+            .filter(Boolean)
+        )
+      ).sort(ordenarTexto),
+    [pecas, marca]
+  );
 
   const resultados = useMemo(() => {
     if (!pesquisou || !pesquisa.trim()) return [];
@@ -198,60 +178,65 @@ export default function Home() {
   }
 
   function limparFormulario() {
+    setIdEmEdicao(null);
     setMarca("");
     setModelo("");
+    setNovoModelo(true);
     setTipo("Incell");
     setPreco("");
     setLink("");
     setFornecedor("Mercado Livre");
-    setEditandoId(null);
   }
 
-  function novoModelo() {
+  function escolherMarca(valor: string) {
+    setMarca(valor);
     setModelo("");
-    setEditandoId(null);
-    setTimeout(() => modeloRef.current?.focus(), 0);
+    setNovoModelo(false);
+  }
+
+  function ativarNovoModelo() {
+    setModelo("");
+    setNovoModelo(true);
   }
 
   function editarPeca(peca: Peca) {
+    setIdEmEdicao(peca.id);
     setMarca(peca.marca);
     setModelo(peca.modelo);
+    setNovoModelo(true);
     setTipo(peca.tipo);
-    setPreco(String(peca.preco).replace(".", ","));
+    setPreco(String(peca.preco));
     setLink(peca.link);
     setFornecedor(peca.fornecedor);
-    setEditandoId(peca.id);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function duplicarPeca(peca: Peca) {
+    setIdEmEdicao(null);
     setMarca(peca.marca);
     setModelo(peca.modelo);
+    setNovoModelo(true);
     setTipo(peca.tipo);
-    setPreco(String(peca.preco).replace(".", ","));
+    setPreco(String(peca.preco));
     setLink(peca.link);
     setFornecedor(peca.fornecedor);
-    setEditandoId(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   async function salvarPeca(event: FormEvent) {
     event.preventDefault();
 
-    if (!marca.trim() || !modelo.trim() || !tipo.trim() || !preco.trim()) {
+    if (!marca.trim() || !modelo.trim() || !tipo.trim() || !preco) {
       alert("Preencha marca, modelo, tipo e preço.");
       return;
     }
 
-    const valor = converterPreco(preco);
+    const valor = Number(preco.replace(",", "."));
 
     if (!Number.isFinite(valor) || valor <= 0) {
       alert("Digite um preço válido.");
       return;
     }
-
-    setSalvando(true);
-    setErroBanco("");
 
     const dados = {
       marca: marca.trim(),
@@ -262,14 +247,17 @@ export default function Home() {
       fornecedor: fornecedor.trim() || "Não informado",
     };
 
-    const resposta = editandoId
-      ? await supabase.from("pecas").update(dados).eq("id", editandoId)
+    setSalvando(true);
+    setErroBanco("");
+
+    const resposta = idEmEdicao
+      ? await supabase.from("pecas").update(dados).eq("id", idEmEdicao)
       : await supabase.from("pecas").insert(dados);
 
     if (resposta.error) {
       console.error(resposta.error);
       setErroBanco(
-        editandoId
+        idEmEdicao
           ? "Não foi possível atualizar a peça online."
           : "Não foi possível salvar a peça online."
       );
@@ -277,11 +265,14 @@ export default function Home() {
       return;
     }
 
-    const estavaEditando = editandoId !== null;
+    const mensagem = idEmEdicao
+      ? "Peça atualizada online com sucesso!"
+      : "Peça cadastrada online com sucesso!";
+
     limparFormulario();
     await carregarPecas();
     setSalvando(false);
-    alert(estavaEditando ? "Peça atualizada com sucesso!" : "Peça cadastrada com sucesso!");
+    alert(mensagem);
   }
 
   async function excluirPeca(id: number) {
@@ -298,26 +289,25 @@ export default function Home() {
       return;
     }
 
-    if (editandoId === id) limparFormulario();
+    if (idEmEdicao === id) limparFormulario();
     await carregarPecas();
   }
 
   function montarMensagem() {
     if (!resultados.length) return "";
 
-    const nomeAparelho = `${resultados[0].marca} ${resultados[0].modelo}`.trim();
+    const aparelho = `${resultados[0].marca} ${resultados[0].modelo}`.trim();
 
     return [
       "📱 *DenysCell Assistência Técnica*",
       "",
-      `Orçamento para *${nomeAparelho}*:`,
+      `Orçamento para *${aparelho}*:`,
       "",
       ...resultados.map(
         (peca) =>
           `• Tela ${peca.tipo}: *${dinheiro(peca.preco + MAO_DE_OBRA)}*`
       ),
       "",
-      `✅ Mão de obra incluída: ${dinheiro(MAO_DE_OBRA)}`,
       "✅ Garantia de 90 dias para o serviço.",
       "Valores sujeitos à disponibilidade da peça.",
     ].join("\n");
@@ -383,15 +373,17 @@ export default function Home() {
             <section className="rounded-3xl border border-red-800 bg-zinc-950 p-6 shadow-2xl shadow-red-950/30">
               <form onSubmit={buscar}>
                 <label className="font-bold">Marca ou modelo do aparelho</label>
+
                 <input
                   value={pesquisa}
                   onChange={(event) => {
                     setPesquisa(event.target.value);
                     setPesquisou(false);
                   }}
-                  placeholder="Ex.: Motorola G54 ou G54"
+                  placeholder="Ex.: Motorola G54 ou apenas G54"
                   className="mt-2 w-full rounded-xl border border-red-800 bg-black p-4 text-white outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
                 />
+
                 <button className="mt-5 w-full rounded-xl bg-red-600 p-4 text-lg font-black transition hover:bg-red-500">
                   🔎 Buscar orçamento
                 </button>
@@ -419,18 +411,28 @@ export default function Home() {
             {resultados.length > 0 && (
               <section className="mt-6 space-y-4">
                 {resultados.map((peca) => (
-                  <article key={peca.id} className="rounded-2xl border border-red-900 bg-zinc-950 p-5">
+                  <article
+                    key={peca.id}
+                    className="rounded-2xl border border-red-900 bg-zinc-950 p-5"
+                  >
                     <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
                       <div>
                         <p className="text-sm font-bold text-red-400">
                           {peca.marca} {peca.modelo}
                         </p>
+
                         <h2 className="mt-1 text-xl font-black">Tela {peca.tipo}</h2>
+
                         <p className="mt-2 text-zinc-400">Peça: {dinheiro(peca.preco)}</p>
-                        <p className="text-sm text-zinc-500">Fornecedor: {peca.fornecedor}</p>
+
+                        <p className="text-sm text-zinc-500">
+                          Fornecedor: {peca.fornecedor}
+                        </p>
                       </div>
+
                       <div className="sm:text-right">
                         <p className="text-sm text-zinc-400">Valor para o cliente</p>
+
                         <p className="text-3xl font-black text-green-400">
                           {dinheiro(peca.preco + MAO_DE_OBRA)}
                         </p>
@@ -457,7 +459,11 @@ export default function Home() {
                   >
                     {copiado ? "✅ Orçamento copiado" : "📋 Copiar orçamento"}
                   </button>
-                  <button onClick={abrirWhatsApp} className="rounded-xl bg-green-600 p-4 font-bold hover:bg-green-500">
+
+                  <button
+                    onClick={abrirWhatsApp}
+                    className="rounded-xl bg-green-600 p-4 font-bold hover:bg-green-500"
+                  >
                     📲 Abrir no WhatsApp
                   </button>
                 </div>
@@ -475,6 +481,7 @@ export default function Home() {
                   Cadastre, edite, duplique e exclua peças.
                 </p>
               </div>
+
               <button
                 onClick={bloquearAdministracao}
                 className="rounded-xl border border-red-500/40 bg-red-950/40 px-4 py-2 font-bold text-red-300"
@@ -483,18 +490,24 @@ export default function Home() {
               </button>
             </div>
 
+            {idEmEdicao && (
+              <div className="mt-6 rounded-xl border border-yellow-500/50 bg-yellow-950/30 p-4 text-yellow-200">
+                ✏️ Você está editando uma peça cadastrada.
+              </div>
+            )}
+
             <form onSubmit={salvarPeca} className="mt-6 space-y-4">
               <div>
                 <label className="font-bold">Marca</label>
                 <input
-                  list="marcas-denyscell"
+                  list="lista-marcas"
                   value={marca}
-                  onChange={(event) => setMarca(event.target.value)}
+                  onChange={(event) => escolherMarca(event.target.value)}
                   placeholder="Ex.: Motorola"
                   className="mt-2 w-full rounded-xl border border-red-800 bg-black p-4 outline-none focus:border-red-500"
                 />
-                <datalist id="marcas-denyscell">
-                  {marcasDisponiveis.map((item) => (
+                <datalist id="lista-marcas">
+                  {marcas.map((item) => (
                     <option key={item} value={item} />
                   ))}
                 </datalist>
@@ -502,28 +515,41 @@ export default function Home() {
 
               <div>
                 <div className="flex items-center justify-between gap-3">
-                  <label className="font-bold">Modelo</label>
+                  <label className="font-bold">Modelo do aparelho</label>
                   <button
                     type="button"
-                    onClick={novoModelo}
-                    className="rounded-lg border border-red-700 px-3 py-2 text-sm font-bold text-red-400 hover:bg-red-950/30"
+                    onClick={ativarNovoModelo}
+                    className="rounded-lg border border-red-700 px-3 py-2 text-sm font-bold text-red-400 hover:bg-red-950/40"
                   >
                     ➕ Novo modelo
                   </button>
                 </div>
-                <input
-                  ref={modeloRef}
-                  list="modelos-denyscell"
-                  value={modelo}
-                  onChange={(event) => setModelo(event.target.value)}
-                  placeholder="Ex.: G54"
-                  className="mt-2 w-full rounded-xl border border-red-800 bg-black p-4 outline-none focus:border-red-500"
-                />
-                <datalist id="modelos-denyscell">
-                  {modelosDisponiveis.map((item) => (
-                    <option key={item} value={item} />
-                  ))}
-                </datalist>
+
+                {!novoModelo && modelosDaMarca.length > 0 ? (
+                  <select
+                    value={modelo}
+                    onChange={(event) => setModelo(event.target.value)}
+                    className="mt-2 w-full rounded-xl border border-red-800 bg-black p-4 outline-none focus:border-red-500"
+                  >
+                    <option value="">Selecione um modelo</option>
+                    {modelosDaMarca.map((item) => (
+                      <option key={item} value={item}>{item}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    value={modelo}
+                    onChange={(event) => setModelo(event.target.value)}
+                    placeholder="Ex.: G54"
+                    className="mt-2 w-full rounded-xl border border-red-800 bg-black p-4 outline-none focus:border-red-500"
+                  />
+                )}
+
+                {!novoModelo && modelosDaMarca.length === 0 && marca.trim() && (
+                  <p className="mt-2 text-sm text-zinc-500">
+                    Nenhum modelo cadastrado nessa marca. Clique em “Novo modelo”.
+                  </p>
+                )}
               </div>
 
               <div>
@@ -533,9 +559,13 @@ export default function Home() {
                   onChange={(event) => setTipo(event.target.value)}
                   className="mt-2 w-full rounded-xl border border-red-800 bg-black p-4 outline-none focus:border-red-500"
                 >
-                  {tiposDeTela.map((item) => (
-                    <option key={item}>{item}</option>
-                  ))}
+                  <option>Incell</option>
+                  <option>OLED</option>
+                  <option>Original</option>
+                  <option>Original nacional</option>
+                  <option>Com aro</option>
+                  <option>Sem aro</option>
+                  <option>Outro</option>
                 </select>
               </div>
 
@@ -545,7 +575,7 @@ export default function Home() {
                   inputMode="decimal"
                   value={preco}
                   onChange={(event) => setPreco(event.target.value)}
-                  placeholder="Ex.: 186,99"
+                  placeholder="Ex.: 185,00"
                   className="mt-2 w-full rounded-xl border border-red-800 bg-black p-4 outline-none focus:border-red-500"
                 />
               </div>
@@ -573,21 +603,24 @@ export default function Home() {
               <div className="grid gap-3 sm:grid-cols-2">
                 <button
                   disabled={salvando}
-                  className="rounded-xl bg-red-600 p-4 text-lg font-black hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="w-full rounded-xl bg-red-600 p-4 text-lg font-black hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {salvando
                     ? "Salvando online..."
-                    : editandoId
+                    : idEmEdicao
                     ? "💾 Atualizar peça"
                     : "💾 Salvar peça"}
                 </button>
-                <button
-                  type="button"
-                  onClick={limparFormulario}
-                  className="rounded-xl border border-zinc-700 p-4 font-bold text-zinc-300 hover:bg-zinc-900"
-                >
-                  {editandoId ? "Cancelar edição" : "Limpar campos"}
-                </button>
+
+                {idEmEdicao && (
+                  <button
+                    type="button"
+                    onClick={limparFormulario}
+                    className="w-full rounded-xl border border-red-800 bg-black p-4 text-lg font-black text-red-400 hover:bg-red-950/30"
+                  >
+                    Cancelar edição
+                  </button>
+                )}
               </div>
             </form>
 
@@ -599,11 +632,12 @@ export default function Home() {
 
             <div className="mt-10">
               <h3 className="text-xl font-black">Peças cadastradas ({pecas.length})</h3>
+
               <div className="mt-4 space-y-3">
                 {pecas.map((peca) => (
                   <div
                     key={peca.id}
-                    className="flex flex-col justify-between gap-3 rounded-xl border border-red-900 bg-black p-4 lg:flex-row lg:items-center"
+                    className="flex flex-col justify-between gap-4 rounded-xl border border-red-900 bg-black p-4 lg:flex-row lg:items-center"
                   >
                     <div>
                       <p className="font-black">
@@ -612,28 +646,36 @@ export default function Home() {
                       <p className="text-sm text-zinc-400">
                         {dinheiro(peca.preco)} · {peca.fornecedor}
                       </p>
+                      {peca.link && (
+                        <a
+                          href={peca.link}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-1 inline-block text-sm font-bold text-yellow-400 hover:underline"
+                        >
+                          Abrir link da peça
+                        </a>
+                      )}
                     </div>
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+
+                    <div className="grid grid-cols-3 gap-2">
                       <button
-                        type="button"
                         onClick={() => editarPeca(peca)}
-                        className="rounded-lg bg-blue-600 px-4 py-2 font-bold hover:bg-blue-500"
+                        className="rounded-lg bg-yellow-500 px-3 py-2 font-bold text-black hover:bg-yellow-400"
                       >
                         ✏️ Editar
                       </button>
                       <button
-                        type="button"
                         onClick={() => duplicarPeca(peca)}
-                        className="rounded-lg bg-zinc-700 px-4 py-2 font-bold hover:bg-zinc-600"
+                        className="rounded-lg bg-zinc-700 px-3 py-2 font-bold hover:bg-zinc-600"
                       >
                         📋 Duplicar
                       </button>
                       <button
-                        type="button"
                         onClick={() => excluirPeca(peca.id)}
-                        className="rounded-lg bg-red-600 px-4 py-2 font-bold hover:bg-red-500"
+                        className="rounded-lg bg-red-600 px-3 py-2 font-bold hover:bg-red-500"
                       >
-                        🗑 Excluir
+                        Excluir
                       </button>
                     </div>
                   </div>
@@ -656,7 +698,10 @@ export default function Home() {
           >
             <div className="text-center text-4xl">🔒</div>
             <h2 className="mt-3 text-center text-2xl font-black">Área administrativa</h2>
-            <p className="mt-2 text-center text-sm text-zinc-400">Digite a senha para continuar.</p>
+            <p className="mt-2 text-center text-sm text-zinc-400">
+              Digite a senha para continuar.
+            </p>
+
             <input
               autoFocus
               type="password"
@@ -668,8 +713,15 @@ export default function Home() {
               placeholder="Digite a senha"
               className="mt-6 w-full rounded-xl border border-red-800 bg-black p-4 text-center text-lg outline-none focus:border-red-500"
             />
-            {erroSenha && <p className="mt-3 text-center font-bold text-red-400">{erroSenha}</p>}
-            <button className="mt-5 w-full rounded-xl bg-red-600 p-4 font-bold hover:bg-red-500">Entrar</button>
+
+            {erroSenha && (
+              <p className="mt-3 text-center font-bold text-red-400">{erroSenha}</p>
+            )}
+
+            <button className="mt-5 w-full rounded-xl bg-red-600 p-4 font-bold hover:bg-red-500">
+              Entrar
+            </button>
+
             <button
               type="button"
               onClick={() => setMostrarSenha(false)}

@@ -1,0 +1,32 @@
+ATUALIZAÇÃO DENYSCELL — MARCA, NOVO MODELO, EDITAR E DUPLICAR
+
+1) No Supabase:
+   - Abra SQL Editor > New query.
+   - Abra o arquivo supabase-atualizacao.sql deste pacote.
+   - Copie tudo, cole no SQL Editor e clique em Run.
+   - Deve aparecer "Success".
+
+2) No computador:
+   - Substitua o arquivo app/page.tsx do seu projeto pelo arquivo deste pacote.
+   - NÃO apague seu .env.local.
+
+3) No terminal do projeto, execute:
+   git add .
+   git commit -m "Adiciona marca novo modelo editar e duplicar"
+   git push
+
+4) A Netlify publicará automaticamente. Se não publicar:
+   - Netlify > Deploys > Trigger deploy > Deploy site.
+
+FUNÇÕES NOVAS
+- Organização por marca e modelo.
+- Botão "+ Novo modelo".
+- Editar preço, fornecedor, tipo e link.
+- Duplicar cadastro.
+- Excluir cadastro.
+- Pesquisa por marca ou modelo.
+- Mantém senha 1998 e mão de obra fixa de R$ 150.
+
+IMPORTANTE
+- O arquivo .env.local não está incluído para proteger suas chaves.
+- Seus cadastros existentes não são apagados; eles ficam inicialmente em "Sem marca" e podem ser editados.
