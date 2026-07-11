@@ -11,7 +11,8 @@ type Peca = {
   fornecedor: string;
 };
 
-const SENHA_ADMIN = "05082026";
+const SENHA_ADMIN = "1998";
+const MAO_DE_OBRA = 150;
 
 const pecasIniciais: Peca[] = [
   {
@@ -19,6 +20,22 @@ const pecasIniciais: Peca[] = [
     modelo: "iPhone 11",
     tipo: "Incell",
     preco: 185,
+    link: "https://www.mercadolivre.com.br/",
+    fornecedor: "Mercado Livre",
+  },
+  {
+    id: "2",
+    modelo: "iPhone 11",
+    tipo: "OLED",
+    preco: 299,
+    link: "https://www.mercadolivre.com.br/",
+    fornecedor: "Mercado Livre",
+  },
+  {
+    id: "3",
+    modelo: "iPhone XR",
+    tipo: "Incell",
+    preco: 170,
     link: "https://www.mercadolivre.com.br/",
     fornecedor: "Mercado Livre",
   },
@@ -43,8 +60,8 @@ function normalizar(texto: string) {
 export default function Home() {
   const [aba, setAba] = useState<"orcamento" | "cadastro">("orcamento");
   const [pecas, setPecas] = useState<Peca[]>(pecasIniciais);
+
   const [pesquisa, setPesquisa] = useState("");
-  const [maoDeObra, setMaoDeObra] = useState(150);
   const [pesquisou, setPesquisou] = useState(false);
   const [copiado, setCopiado] = useState(false);
 
@@ -61,6 +78,7 @@ export default function Home() {
 
   useEffect(() => {
     const salvas = localStorage.getItem("denyscell-pecas");
+
     if (salvas) {
       try {
         setPecas(JSON.parse(salvas));
@@ -76,8 +94,12 @@ export default function Home() {
 
   const resultados = useMemo(() => {
     if (!pesquisou || !pesquisa.trim()) return [];
+
     const busca = normalizar(pesquisa);
-    return pecas.filter((peca) => normalizar(peca.modelo).includes(busca));
+
+    return pecas.filter((peca) =>
+      normalizar(peca.modelo).includes(busca)
+    );
   }, [pecas, pesquisa, pesquisou]);
 
   function buscar(event?: FormEvent) {
@@ -86,11 +108,12 @@ export default function Home() {
     setCopiado(false);
   }
 
-  function abrirCadastro() {
+  function abrirAdministracao() {
     if (adminLiberado) {
       setAba("cadastro");
       return;
     }
+
     setSenhaDigitada("");
     setErroSenha("");
     setMostrarSenha(true);
@@ -98,6 +121,7 @@ export default function Home() {
 
   function confirmarSenha(event: FormEvent) {
     event.preventDefault();
+
     if (senhaDigitada === SENHA_ADMIN) {
       setAdminLiberado(true);
       setMostrarSenha(false);
@@ -109,7 +133,7 @@ export default function Home() {
     }
   }
 
-  function bloquearCadastro() {
+  function bloquearAdministracao() {
     setAdminLiberado(false);
     setAba("orcamento");
   }
@@ -123,34 +147,39 @@ export default function Home() {
     }
 
     const valor = Number(preco);
+
     if (!Number.isFinite(valor) || valor <= 0) {
       alert("Digite um preço válido.");
       return;
     }
 
-    setPecas((anteriores) => [
-      ...anteriores,
-      {
-        id: crypto.randomUUID(),
-        modelo: modelo.trim(),
-        tipo: tipo.trim(),
-        preco: valor,
-        link: link.trim(),
-        fornecedor: fornecedor.trim() || "Não informado",
-      },
-    ]);
+    const novaPeca: Peca = {
+      id: crypto.randomUUID(),
+      modelo: modelo.trim(),
+      tipo: tipo.trim(),
+      preco: valor,
+      link: link.trim(),
+      fornecedor: fornecedor.trim() || "Não informado",
+    };
+
+    setPecas((anteriores) => [...anteriores, novaPeca]);
 
     setModelo("");
     setTipo("Incell");
     setPreco("");
     setLink("");
     setFornecedor("Mercado Livre");
+
     alert("Peça cadastrada com sucesso!");
   }
 
   function excluirPeca(id: string) {
-    if (window.confirm("Deseja excluir esta peça?")) {
-      setPecas((anteriores) => anteriores.filter((peca) => peca.id !== id));
+    const confirmou = window.confirm("Deseja excluir esta peça?");
+
+    if (confirmou) {
+      setPecas((anteriores) =>
+        anteriores.filter((peca) => peca.id !== id)
+      );
     }
   }
 
@@ -164,10 +193,11 @@ export default function Home() {
       "",
       ...resultados.map(
         (peca) =>
-          `• Tela ${peca.tipo}: *${dinheiro(peca.preco + maoDeObra)}*`
+          `• Tela ${peca.tipo}: *${dinheiro(
+            peca.preco + MAO_DE_OBRA
+          )}*`
       ),
       "",
-      `✅ Mão de obra incluída: ${dinheiro(maoDeObra)}`,
       "✅ Garantia de 90 dias para o serviço.",
       "Valores sujeitos à disponibilidade da peça.",
     ].join("\n");
@@ -176,6 +206,7 @@ export default function Home() {
   async function copiarOrcamento() {
     const texto = montarMensagem();
     if (!texto) return;
+
     await navigator.clipboard.writeText(texto);
     setCopiado(true);
     setTimeout(() => setCopiado(false), 2500);
@@ -184,6 +215,7 @@ export default function Home() {
   function abrirWhatsApp() {
     const texto = montarMensagem();
     if (!texto) return;
+
     window.open(
       `https://wa.me/?text=${encodeURIComponent(texto)}`,
       "_blank",
@@ -207,22 +239,22 @@ export default function Home() {
             onClick={() => setAba("orcamento")}
             className={`rounded-2xl border p-4 text-lg font-black transition ${
               aba === "orcamento"
-                ? "bg-red-600"
-                : "border border-red-700 bg-black text-red-500 hover:bg-red-950/30"
+                ? "border-red-500 bg-red-600 text-white shadow-lg shadow-red-900/40"
+                : "border-red-700 bg-black text-red-500 hover:bg-red-950/30"
             }`}
           >
             🔎 Fazer orçamento
           </button>
 
           <button
-            onClick={abrirCadastro}
+            onClick={abrirAdministracao}
             className={`rounded-2xl border p-4 text-lg font-black transition ${
               aba === "cadastro"
-                ? "bg-red-600"
-                : "border border-red-700 bg-black text-red-500 hover:bg-red-950/30"
+                ? "border-red-500 bg-red-600 text-white shadow-lg shadow-red-900/40"
+                : "border-red-700 bg-black text-red-500 hover:bg-red-950/30"
             }`}
           >
-            🔒 Cadastrar peça
+            🔒 Área administrativa
           </button>
         </div>
 
@@ -231,6 +263,7 @@ export default function Home() {
             <section className="rounded-3xl border border-red-800 bg-zinc-950 p-6 shadow-2xl shadow-red-950/30">
               <form onSubmit={buscar}>
                 <label className="font-bold">Modelo do aparelho</label>
+
                 <input
                   value={pesquisa}
                   onChange={(event) => {
@@ -238,19 +271,10 @@ export default function Home() {
                     setPesquisou(false);
                   }}
                   placeholder="Ex.: iPhone 11"
-                  className="mt-2 w-full rounded-xl border border-red-800 bg-black p-4 outline-none focus:border-red-500"
+                  className="mt-2 w-full rounded-xl border border-red-800 bg-black p-4 text-white outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
                 />
 
-                <label className="mt-5 block font-bold">Mão de obra</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={maoDeObra}
-                  onChange={(event) => setMaoDeObra(Number(event.target.value))}
-                  className="mt-2 w-full rounded-xl border border-red-800 bg-black p-4 outline-none focus:border-red-500"
-                />
-
-                <button className="mt-5 w-full rounded-xl bg-red-600 p-4 text-lg font-black hover:bg-red-500">
+                <button className="mt-5 w-full rounded-xl bg-red-600 p-4 text-lg font-black transition hover:bg-red-500">
                   🔎 Buscar orçamento
                 </button>
               </form>
@@ -267,19 +291,22 @@ export default function Home() {
                 {resultados.map((peca) => (
                   <article
                     key={peca.id}
-                    className="rounded-2xl border border-red-950 bg-zinc-950 p-5"
+                    className="rounded-2xl border border-red-900 bg-zinc-950 p-5"
                   >
                     <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
                       <div>
                         <p className="text-sm font-bold text-red-400">
                           {peca.modelo}
                         </p>
+
                         <h2 className="mt-1 text-xl font-black">
                           Tela {peca.tipo}
                         </h2>
+
                         <p className="mt-2 text-zinc-400">
                           Peça: {dinheiro(peca.preco)}
                         </p>
+
                         <p className="text-sm text-zinc-500">
                           Fornecedor: {peca.fornecedor}
                         </p>
@@ -289,8 +316,9 @@ export default function Home() {
                         <p className="text-sm text-zinc-400">
                           Valor para o cliente
                         </p>
+
                         <p className="text-3xl font-black text-green-400">
-                          {dinheiro(peca.preco + maoDeObra)}
+                          {dinheiro(peca.preco + MAO_DE_OBRA)}
                         </p>
                       </div>
                     </div>
@@ -300,7 +328,7 @@ export default function Home() {
                         href={peca.link}
                         target="_blank"
                         rel="noreferrer"
-                        className="mt-5 block rounded-xl bg-yellow-500 p-3 text-center font-black text-black"
+                        className="mt-5 block rounded-xl bg-yellow-500 p-3 text-center font-black text-black hover:bg-yellow-400"
                       >
                         🛒 Comprar esta peça
                       </a>
@@ -311,14 +339,16 @@ export default function Home() {
                 <div className="grid gap-3 sm:grid-cols-2">
                   <button
                     onClick={copiarOrcamento}
-                    className="rounded-xl border border-zinc-700 bg-zinc-950 p-4 font-bold"
+                    className="rounded-xl border border-red-800 bg-black p-4 font-bold text-red-400 hover:bg-red-950/30"
                   >
-                    {copiado ? "✅ Orçamento copiado" : "📋 Copiar orçamento"}
+                    {copiado
+                      ? "✅ Orçamento copiado"
+                      : "📋 Copiar orçamento"}
                   </button>
 
                   <button
                     onClick={abrirWhatsApp}
-                    className="rounded-xl bg-green-600 p-4 font-bold"
+                    className="rounded-xl bg-green-600 p-4 font-bold hover:bg-green-500"
                   >
                     📲 Abrir no WhatsApp
                   </button>
@@ -332,25 +362,27 @@ export default function Home() {
           <section className="rounded-3xl border border-red-800 bg-zinc-950 p-6 shadow-2xl shadow-red-950/30">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
               <div>
-                <h2 className="text-2xl font-black text-red-400">
-                  Cadastrar nova tela
+                <h2 className="text-2xl font-black text-red-500">
+                  Área administrativa
                 </h2>
+
                 <p className="mt-1 text-sm text-zinc-500">
-                  Área protegida por senha
+                  Cadastre, consulte e exclua peças.
                 </p>
               </div>
 
               <button
-                onClick={bloquearCadastro}
+                onClick={bloquearAdministracao}
                 className="rounded-xl border border-red-500/40 bg-red-950/40 px-4 py-2 font-bold text-red-300"
               >
-                🔒 Bloquear área
+                🔒 Sair da área
               </button>
             </div>
 
             <form onSubmit={cadastrarPeca} className="mt-6 space-y-4">
               <div>
                 <label className="font-bold">Modelo do aparelho</label>
+
                 <input
                   value={modelo}
                   onChange={(event) => setModelo(event.target.value)}
@@ -361,6 +393,7 @@ export default function Home() {
 
               <div>
                 <label className="font-bold">Tipo da tela</label>
+
                 <select
                   value={tipo}
                   onChange={(event) => setTipo(event.target.value)}
@@ -378,6 +411,7 @@ export default function Home() {
 
               <div>
                 <label className="font-bold">Preço da peça</label>
+
                 <input
                   type="number"
                   min="0"
@@ -391,9 +425,12 @@ export default function Home() {
 
               <div>
                 <label className="font-bold">Fornecedor</label>
+
                 <input
                   value={fornecedor}
-                  onChange={(event) => setFornecedor(event.target.value)}
+                  onChange={(event) =>
+                    setFornecedor(event.target.value)
+                  }
                   placeholder="Ex.: Mercado Livre"
                   className="mt-2 w-full rounded-xl border border-red-800 bg-black p-4 outline-none focus:border-red-500"
                 />
@@ -401,6 +438,7 @@ export default function Home() {
 
               <div>
                 <label className="font-bold">Link para comprar</label>
+
                 <input
                   value={link}
                   onChange={(event) => setLink(event.target.value)}
@@ -409,7 +447,7 @@ export default function Home() {
                 />
               </div>
 
-              <button className="w-full rounded-xl bg-green-600 p-4 font-bold">
+              <button className="w-full rounded-xl bg-red-600 p-4 text-lg font-black hover:bg-red-500">
                 💾 Salvar peça
               </button>
             </form>
@@ -423,12 +461,13 @@ export default function Home() {
                 {pecas.map((peca) => (
                   <div
                     key={peca.id}
-                    className="flex flex-col justify-between gap-3 rounded-xl border border-zinc-800 bg-black p-4 sm:flex-row sm:items-center"
+                    className="flex flex-col justify-between gap-3 rounded-xl border border-red-900 bg-black p-4 sm:flex-row sm:items-center"
                   >
                     <div>
                       <p className="font-black">
                         {peca.modelo} — {peca.tipo}
                       </p>
+
                       <p className="text-sm text-zinc-400">
                         {dinheiro(peca.preco)} · {peca.fornecedor}
                       </p>
@@ -436,7 +475,7 @@ export default function Home() {
 
                     <button
                       onClick={() => excluirPeca(peca.id)}
-                      className="rounded-lg bg-red-600 px-4 py-2 font-bold"
+                      className="rounded-lg bg-red-600 px-4 py-2 font-bold hover:bg-red-500"
                     >
                       Excluir
                     </button>
@@ -446,6 +485,7 @@ export default function Home() {
             </div>
           </section>
         )}
+
         <footer className="mt-10 text-center text-sm text-zinc-500">
           © 2026 <span className="text-red-500">DenysCell</span>
         </footer>
@@ -455,14 +495,16 @@ export default function Home() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4">
           <form
             onSubmit={confirmarSenha}
-            className="w-full max-w-sm rounded-3xl border border-red-950 bg-zinc-950 p-6"
+            className="w-full max-w-sm rounded-3xl border border-red-800 bg-zinc-950 p-6 shadow-2xl shadow-red-950/50"
           >
             <div className="text-center text-4xl">🔒</div>
+
             <h2 className="mt-3 text-center text-2xl font-black">
               Área administrativa
             </h2>
+
             <p className="mt-2 text-center text-sm text-zinc-400">
-              Digite a senha para cadastrar peças.
+              Digite a senha para continuar.
             </p>
 
             <input
@@ -483,14 +525,14 @@ export default function Home() {
               </p>
             )}
 
-            <button className="mt-5 w-full rounded-xl bg-red-600 p-4 font-bold">
+            <button className="mt-5 w-full rounded-xl bg-red-600 p-4 font-bold hover:bg-red-500">
               Entrar
             </button>
 
             <button
               type="button"
               onClick={() => setMostrarSenha(false)}
-              className="mt-3 w-full rounded-xl border border-zinc-700 p-4 font-bold text-zinc-400"
+              className="mt-3 w-full rounded-xl border border-red-800 p-4 font-bold text-zinc-400"
             >
               Cancelar
             </button>
