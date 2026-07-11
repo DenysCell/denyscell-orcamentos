@@ -1,9 +1,10 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { createClient } from "@supabase/supabase-js";
 
 type Peca = {
-  id: string;
+  id: number;
   modelo: string;
   tipo: string;
   preco: number;
@@ -14,32 +15,16 @@ type Peca = {
 const SENHA_ADMIN = "1998";
 const MAO_DE_OBRA = 150;
 
-const pecasIniciais: Peca[] = [
-  {
-    id: "1",
-    modelo: "iPhone 11",
-    tipo: "Incell",
-    preco: 185,
-    link: "https://www.mercadolivre.com.br/",
-    fornecedor: "Mercado Livre",
-  },
-  {
-    id: "2",
-    modelo: "iPhone 11",
-    tipo: "OLED",
-    preco: 299,
-    link: "https://www.mercadolivre.com.br/",
-    fornecedor: "Mercado Livre",
-  },
-  {
-    id: "3",
-    modelo: "iPhone XR",
-    tipo: "Incell",
-    preco: 170,
-    link: "https://www.mercadolivre.com.br/",
-    fornecedor: "Mercado Livre",
-  },
-];
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error(
+    "Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY."
+  );
+}
+
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 function dinheiro(valor: number) {
   return valor.toLocaleString("pt-BR", {
@@ -59,7 +44,7 @@ function normalizar(texto: string) {
 
 export default function Home() {
   const [aba, setAba] = useState<"orcamento" | "cadastro">("orcamento");
-  const [pecas, setPecas] = useState<Peca[]>(pecasIniciais);
+  const [pecas, setPecas] = useState<Peca[]>([]);
 
   const [pesquisa, setPesquisa] = useState("");
   const [pesquisou, setPesquisou] = useState(false);
@@ -75,22 +60,44 @@ export default function Home() {
   const [senhaDigitada, setSenhaDigitada] = useState("");
   const [erroSenha, setErroSenha] = useState("");
   const [adminLiberado, setAdminLiberado] = useState(false);
+  const [carregando, setCarregando] = useState(true);
+  const [salvando, setSalvando] = useState(false);
+  const [erroBanco, setErroBanco] = useState("");
 
-  useEffect(() => {
-    const salvas = localStorage.getItem("denyscell-pecas");
+  const carregarPecas = useCallback(async () => {
+    setCarregando(true);
+    setErroBanco("");
 
-    if (salvas) {
-      try {
-        setPecas(JSON.parse(salvas));
-      } catch {
-        setPecas(pecasIniciais);
-      }
+    const { data, error } = await supabase
+      .from("pecas")
+      .select("id, modelo, tipo, preco, link, fornecedor")
+      .order("modelo", { ascending: true })
+      .order("tipo", { ascending: true });
+
+    if (error) {
+      console.error(error);
+      setErroBanco("Não foi possível carregar as peças online.");
+      setCarregando(false);
+      return;
     }
+
+    setPecas(
+      (data ?? []).map((peca) => ({
+        id: Number(peca.id),
+        modelo: String(peca.modelo ?? ""),
+        tipo: String(peca.tipo ?? ""),
+        preco: Number(peca.preco ?? 0),
+        link: String(peca.link ?? ""),
+        fornecedor: String(peca.fornecedor ?? ""),
+      }))
+    );
+
+    setCarregando(false);
   }, []);
 
   useEffect(() => {
-    localStorage.setItem("denyscell-pecas", JSON.stringify(pecas));
-  }, [pecas]);
+    void carregarPecas();
+  }, [carregarPecas]);
 
   const resultados = useMemo(() => {
     if (!pesquisou || !pesquisa.trim()) return [];
@@ -138,7 +145,7 @@ export default function Home() {
     setAba("orcamento");
   }
 
-  function cadastrarPeca(event: FormEvent) {
+  async function cadastrarPeca(event: FormEvent) {
     event.preventDefault();
 
     if (!modelo.trim() || !tipo.trim() || !preco) {
@@ -153,16 +160,23 @@ export default function Home() {
       return;
     }
 
-    const novaPeca: Peca = {
-      id: crypto.randomUUID(),
+    setSalvando(true);
+    setErroBanco("");
+
+    const { error } = await supabase.from("pecas").insert({
       modelo: modelo.trim(),
       tipo: tipo.trim(),
       preco: valor,
       link: link.trim(),
       fornecedor: fornecedor.trim() || "Não informado",
-    };
+    });
 
-    setPecas((anteriores) => [...anteriores, novaPeca]);
+    if (error) {
+      console.error(error);
+      setErroBanco("Não foi possível salvar a peça online.");
+      setSalvando(false);
+      return;
+    }
 
     setModelo("");
     setTipo("Incell");
@@ -170,17 +184,26 @@ export default function Home() {
     setLink("");
     setFornecedor("Mercado Livre");
 
-    alert("Peça cadastrada com sucesso!");
+    await carregarPecas();
+    setSalvando(false);
+    alert("Peça cadastrada online com sucesso!");
   }
 
-  function excluirPeca(id: string) {
+  async function excluirPeca(id: number) {
     const confirmou = window.confirm("Deseja excluir esta peça?");
+    if (!confirmou) return;
 
-    if (confirmou) {
-      setPecas((anteriores) =>
-        anteriores.filter((peca) => peca.id !== id)
-      );
+    setErroBanco("");
+
+    const { error } = await supabase.from("pecas").delete().eq("id", id);
+
+    if (error) {
+      console.error(error);
+      setErroBanco("Não foi possível excluir a peça online.");
+      return;
     }
+
+    await carregarPecas();
   }
 
   function montarMensagem() {
@@ -280,7 +303,19 @@ export default function Home() {
               </form>
             </section>
 
-            {pesquisou && resultados.length === 0 && (
+            {carregando && (
+              <div className="mt-5 rounded-xl border border-red-900 bg-zinc-950 p-5 text-center text-zinc-300">
+                Carregando peças online...
+              </div>
+            )}
+
+            {erroBanco && (
+              <div className="mt-5 rounded-xl border border-red-500/40 bg-red-950/40 p-5 text-center text-red-300">
+                {erroBanco}
+              </div>
+            )}
+
+            {pesquisou && !carregando && resultados.length === 0 && (
               <div className="mt-5 rounded-xl border border-red-500/30 bg-red-950/40 p-5 text-center text-red-300">
                 Modelo não encontrado. Cadastre a peça primeiro.
               </div>
@@ -447,8 +482,11 @@ export default function Home() {
                 />
               </div>
 
-              <button className="w-full rounded-xl bg-red-600 p-4 text-lg font-black hover:bg-red-500">
-                💾 Salvar peça
+              <button
+                disabled={salvando}
+                className="w-full rounded-xl bg-red-600 p-4 text-lg font-black hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {salvando ? "Salvando online..." : "💾 Salvar peça"}
               </button>
             </form>
 
