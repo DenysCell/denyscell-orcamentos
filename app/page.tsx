@@ -191,7 +191,13 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-black px-4 py-8 text-white">
       <div className="mx-auto max-w-5xl">
-        <header className="mb-8 text-center">
+         c<header className="mb-10 text-center">
+  <img
+    src="/logo.png"
+    alt="DenysCell"
+    className="mx-auto w-full max-w-2xl object-contain"
+  />
+</header>
           <img
   src="/logo.png"
   alt="DenysCell"
